@@ -1,0 +1,73 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && getUserData().role == 'admin';
+    }
+    
+    function isTeacher() {
+      return isAuthenticated() && getUserData().role == 'teacher';
+    }
+    
+    function isStudent() {
+      return isAuthenticated() && getUserData().role == 'student';
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Users collection
+    match /users/{userId} {
+      allow read: if isAuthenticated(); // Users might need to read profiles or admin reads all
+      allow create: if isAuthenticated(); // Registration
+      allow update: if isOwner(userId) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Teachers collection
+    match /teachers/{teacherId} {
+      allow read: if isAuthenticated(); // Students need to search teachers
+      allow write: if isAdmin() || (isAuthenticated() && request.auth.uid == teacherId); // Teachers might update their own profile
+    }
+
+    // Appointments collection
+    match /appointments/{appointmentId} {
+      allow read: if isAuthenticated() && (
+        request.auth.uid == resource.data.studentId || 
+        request.auth.uid == resource.data.teacherId || 
+        isAdmin()
+      );
+      allow create: if isAuthenticated() && isStudent(); // Only students book?
+      allow update: if isAuthenticated() && (
+        request.auth.uid == resource.data.teacherId || // Teacher approves/rejects
+        isAdmin()
+      );
+    }
+
+    // Messages collection
+    match /messages/{messageId} {
+      allow read: if isAuthenticated() && (
+        request.auth.uid == resource.data.fromId || 
+        request.auth.uid == resource.data.toId
+      );
+      allow create: if isAuthenticated();
+    }
+
+    // Logs collection
+    match /logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAuthenticated(); // System logs actions from client
+    }
+  }
+}
