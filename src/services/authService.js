@@ -31,7 +31,7 @@ export const registerUser = async (email, password, userData) => {
       email,
       name,
       role,
-      approved: role === 'student' ? false : true, // Students need approval
+      approved: role === 'teacher' ? false : true, // Only teachers need admin approval, students are auto-approved
       ...otherData
     });
 
@@ -65,7 +65,7 @@ export const loginUser = async (email, password) => {
 
   const userData = userDoc.data();
 
-  if (userData.role === 'student' && !userData.approved) {
+  if (userData.role === 'teacher' && !userData.approved) {
     await signOut(auth);
     throw new Error("Account not approved yet. Please wait for admin approval.");
   }
@@ -86,6 +86,16 @@ export const getUserRole = async (uid) => {
     return docSnap.data();
   }
   return null;
+};
+
+export const getUserName = async (uid) => {
+  const docRef = doc(db, "users", uid);
+  const docSnap = await getDoc(docRef);
+  if (docSnap.exists()) {
+    const data = docSnap.data();
+    return data.name || 'Unknown';
+  }
+  return 'Unknown';
 };
 
 export const getAllUsers = async () => {

@@ -28,7 +28,7 @@ const Register = () => {
     try {
       await registerUser(formData.email, formData.password, formData);
       if (formData.role === 'student') {
-        alert("Registration successful! Please wait for admin approval.");
+        alert("Registration successful");
         navigate('/login');
       } else {
         navigate('/login');
@@ -72,7 +72,7 @@ const Register = () => {
                         </div>
                     </li>
                     <li className="flex items-start">
-                        <div className="flex-shrink-0">
+                        <div className="shrink-0">
                             <div className="flex items-center justify-center h-8 w-8 rounded-md bg-indigo-500 text-white">
                                 <BookOpen className="h-5 w-5" />
                             </div>
@@ -83,7 +83,7 @@ const Register = () => {
                         </div>
                     </li>
                     <li className="flex items-start">
-                        <div className="flex-shrink-0">
+                        <div className="shrink-0">
                             <div className="flex items-center justify-center h-8 w-8 rounded-md bg-indigo-500 text-white">
                                 <Check className="h-5 w-5" />
                             </div>

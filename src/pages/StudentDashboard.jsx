@@ -3,8 +3,8 @@ import { getAllTeachers, searchTeachers } from '../services/teacherService';
 import { bookAppointment, getAppointmentsForStudent } from '../services/appointmentService';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
-import { logoutUser } from '../services/authService';
-import { getMessages } from '../services/messageService';
+import { logoutUser, getUserName } from '../services/authService';
+import { getMessages, sendMessage, getAppointmentMessages } from '../services/messageService';
 import { 
   Bell, 
   Search, 
@@ -29,6 +29,7 @@ const StudentDashboard = () => {
   const [teachers, setTeachers] = useState([]);
   const [appointments, setAppointments] = useState([]);
   const [messages, setMessages] = useState([]);
+  const [teacherNames, setTeacherNames] = useState({}); // Map teacherId -> name
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('teachers'); // 'teachers' or 'appointments'
   const [selectedTeacher, setSelectedTeacher] = useState(null);
@@ -38,6 +39,11 @@ const StudentDashboard = () => {
   const [bookingDate, setBookingDate] = useState('');
   const [bookingTime, setBookingTime] = useState('');
   const [purpose, setPurpose] = useState('');
+  
+  // Messaging State
+  const [selectedAppointment, setSelectedAppointment] = useState(null);
+  const [appointmentMessages, setAppointmentMessages] = useState([]);
+  const [newMessage, setNewMessage] = useState('');
 //changing
 useEffect(() => {
   if (currentUser) {
@@ -64,6 +70,22 @@ const fetchData = async () => {
   if (activeTab === 'appointments') {
     const apptsData = await getAppointmentsForStudent(currentUser.uid);
     setAppointments(apptsData);
+    
+    // Fetch teacher names for appointments
+    const namesMap = {};
+    const uniqueTeacherIds = [...new Set(apptsData.map(appt => appt.teacherId))];
+    for (const teacherId of uniqueTeacherIds) {
+      if (teacherId) {
+        try {
+          const name = await getUserName(teacherId);
+          namesMap[teacherId] = name;
+        } catch (error) {
+          console.error(`Error fetching teacher name for ${teacherId}:`, error);
+          namesMap[teacherId] = 'Unknown Teacher';
+        }
+      }
+    }
+    setTeacherNames(namesMap);
   }
 
   const msgsData = await getMessages(currentUser.uid);
@@ -95,6 +117,32 @@ const fetchData = async () => {
   const handleLogout = async () => {
     await logoutUser(currentUser.uid);
     navigate('/login');
+  };
+
+  const handleOpenMessages = async (appt) => {
+    if (appt.status === 'approved') {
+      setSelectedAppointment(appt);
+      // Load messages for this appointment
+      const msgs = await getAppointmentMessages(appt.id, currentUser.uid, appt.teacherId);
+      setAppointmentMessages(msgs);
+      setNewMessage('');
+    }
+  };
+
+  const handleSendMessage = async (e) => {
+    e.preventDefault();
+    if (!newMessage.trim() || !selectedAppointment) return;
+    
+    try {
+      await sendMessage(currentUser.uid, selectedAppointment.teacherId, newMessage.trim(), selectedAppointment.id);
+      setNewMessage('');
+      // Reload messages
+      const msgs = await getAppointmentMessages(selectedAppointment.id, currentUser.uid, selectedAppointment.teacherId);
+      setAppointmentMessages(msgs);
+    } catch (error) {
+      console.error('Error sending message:', error);
+      alert('Failed to send message');
+    }
   };
 
   const getInitials = (name) => {
@@ -203,7 +251,7 @@ const fetchData = async () => {
             </h2>
           </div>
           <div className="mt-4 flex md:mt-0 md:ml-4">
-            <button
+            {/* <button
              onClick={() => {
     setActiveTab('teachers');
     if (teachers.length > 0) {
@@ -214,9 +262,9 @@ const fetchData = async () => {
 
               className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
             >
-              <Plus className="-ml-1 mr-2 h-5 w-5" />
-              Book Appointment
-            </button>
+              <Plus className="-ml-1 mr-2 h-5 w-5" /> */}
+              {/* Book Appointment
+            </button> */}
           </div>
         </div>
 
@@ -286,12 +334,12 @@ const fetchData = async () => {
                       <li key={appt.id} className="px-4 py-4 sm:px-6 hover:bg-gray-50">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center">
-                            <div className="flex-shrink-0 h-10 w-10 rounded-full bg-green-100 flex items-center justify-center text-green-600">
-                              <Calendar className="h-5 w-5" />
+                            <div className="flex-shrink-0 h-10 w-10 rounded-full bg-green-100 flex items-center justify-center text-green-600 font-bold">
+                              {getInitials(teacherNames[appt.teacherId] || appt.teacherId)}
                             </div>
                             <div className="ml-4">
                               <div className="text-sm font-medium text-indigo-600 truncate">
-                                Teacher ID: {appt.teacherId}
+                                {teacherNames[appt.teacherId] || 'Loading...'}
                               </div>
                               <div className="flex items-center mt-1">
                                 <Clock className="flex-shrink-0 mr-1.5 h-4 w-4 text-gray-400" />
@@ -299,7 +347,7 @@ const fetchData = async () => {
                               </div>
                             </div>
                           </div>
-                          <div className="flex items-center">
+                          <div className="flex items-center space-x-2">
                              <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                                 appt.status === 'approved' ? 'bg-green-100 text-green-800' : 
                                 appt.status === 'rejected' ? 'bg-red-100 text-red-800' : 
@@ -307,6 +355,15 @@ const fetchData = async () => {
                               }`}>
                                 {appt.status}
                               </span>
+                              {appt.status === 'approved' && (
+                                <button
+                                  onClick={() => handleOpenMessages(appt)}
+                                  className="inline-flex items-center px-2 py-1 border border-transparent text-xs font-medium rounded text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                                >
+                                  <MessageSquare className="h-3 w-3 mr-1" />
+                                  Message
+                                </button>
+                              )}
                           </div>
                         </div>
                       </li>
@@ -372,11 +429,20 @@ const fetchData = async () => {
 
       {/* Booking Modal */}
       {selectedTeacher && (
-        <div className="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-          <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true" onClick={() => setSelectedTeacher(null)}></div>
-            <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-            <div className="inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full sm:p-6">
+        <div className="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true" onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            setSelectedTeacher(null);
+          }
+        }}>
+          {/* Backdrop */}
+          <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity pointer-events-none"></div>
+          
+          {/* Modal Content */}
+          <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0 pointer-events-auto">
+            <div 
+              className="relative transform overflow-hidden rounded-lg bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6" 
+              onClick={(e) => e.stopPropagation()}
+            >
               <div>
                 <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-indigo-100">
                   <Calendar className="h-6 w-6 text-indigo-600" aria-hidden="true" />
@@ -436,6 +502,95 @@ const fetchData = async () => {
                       onClick={() => setSelectedTeacher(null)}
                     >
                       Cancel
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Messaging Modal */}
+      {selectedAppointment && (
+        <div className="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="message-modal-title" role="dialog" aria-modal="true" onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            setSelectedAppointment(null);
+          }
+        }}>
+          <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity pointer-events-none"></div>
+          
+          <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0 pointer-events-auto">
+            <div className="relative transform overflow-hidden rounded-lg bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6" onClick={(e) => e.stopPropagation()}>
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg leading-6 font-medium text-gray-900" id="message-modal-title">
+                    Messages with {teacherNames[selectedAppointment.teacherId] || 'Teacher'}
+                  </h3>
+                  <button
+                    onClick={() => setSelectedAppointment(null)}
+                    className="text-gray-400 hover:text-gray-500"
+                  >
+                    <X className="h-6 w-6" />
+                  </button>
+                </div>
+                
+                {/* Messages Display */}
+                <div className="mb-4 border border-gray-200 rounded-lg p-4 h-64 overflow-y-auto bg-gray-50">
+                  {appointmentMessages.length === 0 ? (
+                    <p className="text-sm text-gray-500 text-center py-8">No messages yet. Start a conversation!</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {appointmentMessages.map((msg) => (
+                        <div
+                          key={msg.id}
+                          className={`flex ${msg.fromId === currentUser.uid ? 'justify-end' : 'justify-start'}`}
+                        >
+                          <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+                            msg.fromId === currentUser.uid
+                              ? 'bg-indigo-600 text-white'
+                              : 'bg-white text-gray-900 border border-gray-300'
+                          }`}>
+                            <p className="text-sm">{msg.message}</p>
+                            {msg.timestamp && (
+                              <p className={`text-xs mt-1 ${
+                                msg.fromId === currentUser.uid ? 'text-indigo-200' : 'text-gray-500'
+                              }`}>
+                                {msg.timestamp.toDate ? msg.timestamp.toDate().toLocaleString() : new Date(msg.timestamp.seconds * 1000).toLocaleString()}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Message Input */}
+                <form onSubmit={handleSendMessage} className="space-y-3">
+                  <div>
+                    <textarea
+                      rows={3}
+                      required
+                      value={newMessage}
+                      onChange={(e) => setNewMessage(e.target.value)}
+                      className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                      placeholder="Type your message..."
+                    />
+                  </div>
+                  <div className="flex justify-end space-x-3">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedAppointment(null)}
+                      className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                    >
+                      Close
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                    >
+                      Send
                     </button>
                   </div>
                 </form>

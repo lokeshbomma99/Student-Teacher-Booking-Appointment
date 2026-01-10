@@ -28,7 +28,10 @@ export const bookAppointment = async (studentId, teacherId, date, time, purpose)
 };
 
 export const getAppointmentsForTeacher = async (teacherId) => {
-  const q = query(collection(db, "appointments"), where("teacherId", "==", teacherId));
+  const q = query(
+    collection(db, "appointments"), 
+    where("teacherId", "==", teacherId)
+  );
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 };

@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { loginUser } from '../services/authService';
+import { auth } from '../services/firebase';
+import { sendPasswordResetEmail } from 'firebase/auth';
 import { Eye, EyeOff, Mail, Lock, BookOpen } from 'lucide-react';
 
 const Login = () => {
@@ -10,6 +12,8 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
+  const [forgotPasswordMode, setForgotPasswordMode] = useState(false);
+  const [resetMessage, setResetMessage] = useState('');
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -23,6 +27,26 @@ const Login = () => {
       else navigate('/');
     } catch (err) {
       setError(err.message || 'Failed to login');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
+    setError('');
+    setResetMessage('');
+    if (!email) {
+      setError('Please enter your email address');
+      return;
+    }
+    setIsLoading(true);
+    try {
+      await sendPasswordResetEmail(auth, email);
+      setResetMessage('Password reset email sent! Please check your inbox.');
+      setForgotPasswordMode(false);
+    } catch (err) {
+      setError(err.message || 'Failed to send password reset email');
     } finally {
       setIsLoading(false);
     }
@@ -53,16 +77,28 @@ const Login = () => {
 
           <div className="mt-8">
             <div className="mt-6">
-              <form onSubmit={handleLogin} className="space-y-6">
-                {error && (
-                  <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded-md">
-                    <div className="flex">
-                      <div className="ml-3">
-                        <p className="text-sm text-red-700">{error}</p>
-                      </div>
+              {error && (
+                <div className="mb-4 bg-red-50 border-l-4 border-red-400 p-4 rounded-md">
+                  <div className="flex">
+                    <div className="ml-3">
+                      <p className="text-sm text-red-700">{error}</p>
                     </div>
                   </div>
-                )}
+                </div>
+              )}
+
+              {resetMessage && (
+                <div className="mb-4 bg-green-50 border-l-4 border-green-400 p-4 rounded-md">
+                  <div className="flex">
+                    <div className="ml-3">
+                      <p className="text-sm text-green-700">{resetMessage}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {!forgotPasswordMode ? (
+                <form onSubmit={handleLogin} className="space-y-6">
 
                 <div>
                   <label htmlFor="email" className="block text-sm font-medium text-gray-700">
@@ -128,9 +164,13 @@ const Login = () => {
                   </div>
 
                   <div className="text-sm">
-                    <a href="#" className="font-medium text-indigo-600 hover:text-indigo-500">
+                    <button
+                      type="button"
+                      onClick={() => setForgotPasswordMode(true)}
+                      className="font-medium text-indigo-600 hover:text-indigo-500"
+                    >
                       Forgot your password?
-                    </a>
+                    </button>
                   </div>
                 </div>
 
@@ -144,6 +184,56 @@ const Login = () => {
                   </button>
                 </div>
               </form>
+              ) : (
+                <form onSubmit={handleForgotPassword} className="space-y-6">
+                  <div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-4">Reset Password</h3>
+                    <label htmlFor="reset-email" className="block text-sm font-medium text-gray-700">
+                      Email address
+                    </label>
+                    <div className="mt-1 relative rounded-md shadow-sm">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <Mail className="h-5 w-5 text-gray-400" />
+                      </div>
+                      <input
+                        id="reset-email"
+                        name="reset-email"
+                        type="email"
+                        autoComplete="email"
+                        required
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="block w-full pl-10 sm:text-sm border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 py-2 border"
+                        placeholder="you@example.com"
+                      />
+                    </div>
+                    <p className="mt-2 text-sm text-gray-500">
+                      Enter your email address and we'll send you a link to reset your password.
+                    </p>
+                  </div>
+
+                  <div className="flex space-x-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setForgotPasswordMode(false);
+                        setError('');
+                        setResetMessage('');
+                      }}
+                      className="flex-1 flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                    >
+                      Back to Login
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isLoading}
+                      className="flex-1 flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+                    >
+                      {isLoading ? 'Sending...' : 'Send Reset Link'}
+                    </button>
+                  </div>
+                </form>
+              )}
             </div>
           </div>
         </div>
