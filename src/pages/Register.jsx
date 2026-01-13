@@ -31,6 +31,8 @@ const Register = () => {
         alert("Registration successful");
         navigate('/login');
       } else {
+                        alert("Registration successful! Please wait for admin approval.");
+
         navigate('/login');
       }
     } catch (err) {
