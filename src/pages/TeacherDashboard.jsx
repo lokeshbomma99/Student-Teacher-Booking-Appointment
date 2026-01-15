@@ -182,7 +182,7 @@ const TeacherDashboard = () => {
                     {getInitials(userData?.name)}
                   </div>
                 </Link>
-                <div className="hidden md:block ml-2 text-sm">
+                <div className=" md:block ml-2 text-sm">
                    <p className="font-medium text-gray-700">{userData?.name || 'Teacher'}</p>
                    <button onClick={handleLogout} className="text-xs text-gray-500 hover:text-indigo-600">Log out</button>
                 </div>
@@ -193,7 +193,6 @@ const TeacherDashboard = () => {
                   onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
                   className="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none"
                 >
-                  {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
                 </button>
               </div>
             </div>
